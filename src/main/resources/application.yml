@@ -1,0 +1,8 @@
+server:
+  port: ${PORT:8080}
+
+vnpay:
+  tmn-code: ${VNP_TMN_CODE:G18S515I}
+  hash-secret: ${VNP_HASH_SECRET:8VPOINLIUTBYIMFPUZSQFWRFHNJ99415}
+  pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+  return-url: ${VNP_RETURN_URL:http://localhost:8080/api/vnpay/callback}
