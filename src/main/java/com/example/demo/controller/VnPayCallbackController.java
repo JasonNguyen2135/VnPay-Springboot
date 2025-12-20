@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,7 +17,8 @@ import java.util.*;
 @RequestMapping("/api/vnpay")
 public class VnPayCallbackController {
 
-    private static final String VNP_HASH_SECRET = "YOUR_VNP_HASH_SECRET";
+    @Value("${vnpay.hashSecret}")
+    private String vnpHashSecret;
 
     @GetMapping("/callback")
     public void handleCallback(
@@ -29,46 +31,49 @@ public class VnPayCallbackController {
                 (k, v) -> vnpParams.put(k, v[0])
         );
 
-        // 🔐 Remove secure hash
         String secureHash = vnpParams.remove("vnp_SecureHash");
         vnpParams.remove("vnp_SecureHashType");
 
-        // 🔐 Build hash data
         String hashData = buildHashData(vnpParams);
-        String calculatedHash = hmacSHA512(VNP_HASH_SECRET, hashData);
+        String calculatedHash = hmacSHA512(vnpHashSecret, hashData);
 
         String txnRef = vnpParams.get("vnp_TxnRef");
         String responseCode = vnpParams.get("vnp_ResponseCode");
 
-        String deepLink;
+        String status =
+                calculatedHash.equalsIgnoreCase(secureHash)
+                        && "00".equals(responseCode)
+                        ? "success"
+                        : "failed";
 
-        if (calculatedHash.equalsIgnoreCase(secureHash)
-                && "00".equals(responseCode)) {
+        // ✅ ANDROID-ONLY INTENT SCHEME
+        String intentUrl =
+                "intent://payment"
+                        + "?status=" + status
+                        + "&appointmentId=" + txnRef
+                        + "#Intent;"
+                        + "scheme=umc;"
+                        + "package=com.example.umc;"
+                        + "end";
 
-            // ✅ SUCCESS
-            deepLink = "umc://payment?status=success&appointmentId=" + txnRef;
-
-            // TODO:
-            // - update DB appointment = PAID
-            // - update Firebase if needed
-
-        } else {
-            // ❌ FAILED
-            deepLink = "umc://payment?status=failed&appointmentId=" + txnRef;
-        }
-
-        response.sendRedirect(deepLink);
+        response.sendRedirect(intentUrl);
     }
+
 
     // ======================
     // HELPERS
     // ======================
 
     private String buildHashData(Map<String, String> params) {
+        if (params == null || params.isEmpty()) {
+            return "";
+        }
+
         List<String> keys = new ArrayList<>(params.keySet());
         Collections.sort(keys);
 
         StringBuilder sb = new StringBuilder();
+
         for (String key : keys) {
             String value = params.get(key);
             if (value != null && !value.isEmpty()) {
@@ -78,9 +83,14 @@ public class VnPayCallbackController {
                         .append("&");
             }
         }
-        sb.deleteCharAt(sb.length() - 1);
+
+        if (sb.length() > 0) {
+            sb.setLength(sb.length() - 1); // remove last &
+        }
+
         return sb.toString();
     }
+
 
     private String hmacSHA512(String key, String data) {
         try {
