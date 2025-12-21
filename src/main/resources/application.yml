@@ -6,3 +6,21 @@ vnpay:
   hashSecret: ${VNP_HASH_SECRET:8VPOINLIUTBYIMFPUZSQFWRFHNJ99415}
   payUrl: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
   returnUrl: ${VNP_RETURN_URL:https://vnpayspringboot-2.onrender.com/api/vnpay/callback}
+spring:
+  datasource:
+    url: jdbc:h2:mem:vnpaydb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
